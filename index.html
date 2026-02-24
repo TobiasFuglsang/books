@@ -1,0 +1,2198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Book Tracker</title>
+
+  <!--
+    ============================================================
+    STEP 1 — FONTS & EXTERNAL RESOURCES
+    ============================================================
+    We're pulling in two Google Fonts:
+    • "Playfair Display" — a classic serif for headings (feels like a library)
+    • "DM Sans" — a clean sans-serif for body text (easy to read)
+
+    No frameworks needed. This is pure HTML + CSS + vanilla JS.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <style>
+    /*
+      ============================================================
+      STEP 2 — CSS CUSTOM PROPERTIES (Variables)
+      ============================================================
+      CSS variables (--name) let us define colors and values once
+      and reuse them everywhere. Change a value here and it updates
+      across the whole page. This is your design "control panel."
+    */
+    :root {
+      --bg:          #f2f2f0;       /* cold off-white, like newsprint */
+      --surface:     #ffffff;       /* card background — pure white */
+      --ink:         #0a0a0a;       /* near-black for main text */
+      --ink-muted:   #999999;       /* muted grey for secondary text */
+      --accent:      #0a0a0a;       /* same as ink — no colour accent */
+      --accent-soft: #f0f0ee;       /* very light grey tint */
+      --border:      #e8e8e6;       /* clean grey dividers */
+      --shadow:      rgba(0,0,0,0.06);
+      --mono:        'DM Mono', monospace;
+      --display:     'Syne', sans-serif;
+    }
+
+    /*
+      ============================================================
+      STEP 3 — RESET & BASE STYLES
+      ============================================================
+      box-sizing: border-box means padding is included inside
+      an element's width — avoids common layout surprises.
+      margin: 0 / padding: 0 removes browser default spacing.
+    */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    /*
+      ============================================================
+      STEP 4 — LAYOUT: HEADER
+      ============================================================
+      The header uses a simple flexbox column to center its
+      children vertically. border-bottom creates a ruled-line look.
+    */
+    header {
+      padding: 3.5rem 2rem 2rem;
+      border-bottom: 1px solid var(--border);
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .header-left {}
+
+    .header-eyebrow {
+      font-family: var(--mono);
+      font-weight: 400;
+      font-size: 0.65rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      margin-bottom: 0.6rem;
+    }
+
+    header h1 {
+      font-family: var(--display);
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 800;
+      line-height: 1;
+      color: var(--ink);
+      letter-spacing: -0.03em;
+    }
+
+    header h1 em {
+      font-style: normal;
+      color: var(--ink-muted);
+      font-weight: 400;
+    }
+
+    .header-meta {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--ink-muted);
+      font-weight: 300;
+      line-height: 1.8;
+    }
+
+    /*
+      ============================================================
+      STEP 5 — FILTER BAR
+      ============================================================
+      A horizontal scrollable bar of filter buttons so users
+      can filter by Status. overflow-x: auto lets it scroll on
+      mobile without breaking layout.
+    */
+    .filter-bar {
+      display: flex;
+      gap: 0.4rem;
+      padding: 1.25rem 2rem;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .filter-bar::-webkit-scrollbar { display: none; }
+
+    .filter-btn {
+      flex-shrink: 0;
+      padding: 0.35rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: transparent;
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-transform: uppercase;
+    }
+
+    .filter-btn:hover {
+      border-color: var(--ink);
+      color: var(--ink);
+    }
+
+    .filter-btn.active {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: white;
+    }
+
+    /*
+      ============================================================
+      STEP 6 — MAIN GRID
+      ============================================================
+      CSS Grid with repeat(auto-fill, minmax(280px, 1fr)) is the
+      secret to a responsive layout without media queries:
+      • auto-fill: create as many columns as will fit
+      • minmax(280px, 1fr): each column is at least 280px wide,
+        but grows equally to fill available space
+    */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2.5rem 2rem;
+    }
+
+    #books-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+
+    /*
+      ============================================================
+      STEP 7 — BOOK CARD
+      ============================================================
+      Each book gets a "card" — a styled container that groups
+      all its info. We use:
+      • border-radius for rounded corners
+      • box-shadow for depth
+      • transform on hover for a lift effect
+      • transition to animate the hover smoothly
+    */
+    .book-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      box-shadow: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .book-card:hover {
+      border-color: #ccc;
+      box-shadow: 0 4px 20px var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .book-title {
+      font-family: var(--display);
+      font-size: 0.98rem;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+    }
+
+    .book-author {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--ink-muted);
+      font-weight: 400;
+      margin-top: 0.2rem;
+      letter-spacing: 0.02em;
+    }
+
+    .status-badge {
+      flex-shrink: 0;
+      font-family: var(--mono);
+      font-size: 0.58rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.5rem;
+      border-radius: 2px;
+      white-space: nowrap;
+    }
+
+    /* Status colours — small pops of colour on otherwise greyscale cards */
+    .status-badge[data-status="Finished"]      { background: #e8f5e8; color: #1e6b1e; }
+    .status-badge[data-status="Reading"]       { background: #e8eef8; color: #1a3d8f; }
+    .status-badge[data-status="Want to read"]  { background: #fef8e8; color: #8a6020; }
+    .status-badge[data-status="Abandoned"]     { background: #fde8e8; color: #8f1a1a; }
+
+    .card-divider {
+      height: 1px;
+      background: var(--border);
+    }
+
+    .rating {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.1em;
+      color: var(--ink-muted);
+    }
+
+    .book-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem 1rem;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    .meta-label {
+      font-family: var(--mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #ccc;
+      font-weight: 400;
+    }
+
+    .meta-value {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--ink-muted);
+      font-weight: 400;
+    }
+
+    .book-notes {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.78rem;
+      color: var(--ink-muted);
+      font-style: italic;
+      line-height: 1.55;
+      border-left: 2px solid var(--border);
+      padding-left: 0.75rem;
+    }
+
+    /*
+      ============================================================
+      STEP 8 — LOADING & ERROR STATES
+      ============================================================
+      Good apps always communicate their state to the user.
+      We show a spinner while fetching, or an error if it fails.
+    */
+    #state-message {
+      grid-column: 1 / -1; /* spans all grid columns */
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--ink-muted);
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .error-msg { color: var(--accent); }
+
+    /*
+      ============================================================
+      SEARCH BAR
+      ============================================================
+      Sits between the filter buttons and the grid.
+      position: relative on the wrapper lets us position the
+      search icon inside the input using absolute positioning —
+      a common CSS trick for icon-inside-input layouts.
+    */
+    .search-wrapper {
+      position: relative;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.25rem 2rem 0;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 2.9rem;
+      top: 50%;
+      transform: translateY(-25%);
+      color: var(--ink-muted);
+      pointer-events: none;
+      font-size: 0.85rem;
+    }
+
+    #search-input {
+      width: 100%;
+      padding: 0.65rem 1rem 0.65rem 2.5rem;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: var(--surface);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--ink);
+      transition: border-color 0.15s;
+    }
+
+    #search-input:focus {
+      outline: none;
+      border-color: var(--ink);
+    }
+
+    #search-input::placeholder {
+      color: #ccc;
+      letter-spacing: 0.04em;
+    }
+
+    /*
+      ============================================================
+      SORT BAR
+      ============================================================
+      Sits between the search box and the grid.
+      We use flexbox with align-items: center to keep the
+      "Sort by:" label and the buttons on the same baseline.
+    */
+    .sort-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1rem 2rem 0;
+      flex-wrap: wrap;
+    }
+
+    .sort-label {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      font-weight: 400;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #ccc;
+      white-space: nowrap;
+    }
+
+    .sort-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      flex-shrink: 0;
+      padding: 0.3rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: transparent;
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 400;
+      color: var(--ink-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .sort-btn:hover {
+      border-color: var(--ink);
+      color: var(--ink);
+    }
+
+    .sort-btn.active {
+      background: var(--accent-soft);
+      border-color: #ccc;
+      color: var(--ink);
+    }
+
+    .sort-arrow {
+      font-style: normal;
+      font-size: 0.65rem;
+      transition: transform 0.2s ease;
+      display: inline-block;
+    }
+
+    .sort-arrow.asc {
+      transform: rotate(180deg);
+    }
+
+
+
+    #stats-bar {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--ink-muted);
+      margin-bottom: 1.5rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      letter-spacing: 0.04em;
+    }
+
+    #stats-bar span strong {
+      color: var(--ink);
+      font-weight: 500;
+    }
+
+    #state-message {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--ink-muted);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 2px solid var(--border);
+      border-top-color: var(--ink);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-msg { color: #c0392b; }
+
+    /* CONFIG PANEL */
+    #config-panel {
+      max-width: 420px;
+      margin: 3rem auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2rem;
+    }
+
+    #config-panel h2 {
+      font-family: var(--display);
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+
+    #config-panel p {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--ink-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.7;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      margin-bottom: 1rem;
+    }
+
+    .field-group label {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+    }
+
+    .field-group input,
+    .field-group select,
+    .field-group textarea {
+      padding: 0.6rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      background: var(--bg);
+      color: var(--ink);
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+
+    .field-group input:focus,
+    .field-group select:focus,
+    .field-group textarea:focus {
+      outline: none;
+      border-color: var(--ink);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--ink);
+      color: white;
+      border: none;
+      border-radius: 3px;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: opacity 0.15s;
+    }
+
+    .btn-primary:hover { opacity: 0.82; }
+    /*
+      ============================================================
+      ADD BOOK BUTTON — floats in the bottom-right corner
+      ============================================================
+    */
+    #add-book-btn {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      width: 48px;
+      height: 48px;
+      border-radius: 3px;
+      background: var(--ink);
+      color: white;
+      font-size: 1.4rem;
+      line-height: 1;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.15s;
+      z-index: 100;
+      font-family: var(--mono);
+    }
+
+    #add-book-btn:hover { opacity: 0.8; }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 1rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal-box {
+      background: var(--surface);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      padding: 2rem;
+      width: 100%;
+      max-width: 440px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.12);
+      transform: translateY(10px);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-overlay.open .modal-box { transform: translateY(0); }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .modal-header h2 {
+      font-family: var(--display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      cursor: pointer;
+      color: var(--ink-muted);
+      padding: 0.2rem 0.4rem;
+      border-radius: 2px;
+      transition: color 0.15s;
+    }
+
+    .modal-close:hover { color: var(--ink); }
+
+    .modal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .modal-grid .field-group.full { grid-column: 1 / -1; }
+
+    .lookup-bar {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .lookup-bar input {
+      flex: 1;
+      padding: 0.6rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      background: var(--bg);
+      color: var(--ink);
+      transition: border-color 0.15s;
+    }
+
+    .lookup-bar input:focus { outline: none; border-color: var(--ink); }
+
+    .btn-lookup {
+      padding: 0.6rem 1rem;
+      background: var(--ink);
+      color: white;
+      border: none;
+      border-radius: 3px;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+
+    .btn-lookup:hover { opacity: 0.8; }
+    .btn-lookup:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .lookup-status { font-family: var(--mono); font-size: 0.7rem; margin: -0.75rem 0 1rem; min-height: 1.1rem; }
+    .lookup-status.success { color: #1e6b1e; }
+    .lookup-status.error   { color: #c0392b; }
+    .lookup-status.loading { color: var(--ink-muted); }
+
+    .modal-divider {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 0.5rem 0 1rem;
+      color: #ccc;
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .modal-divider::before, .modal-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* INLINE EDIT */
+    [data-editable] {
+      cursor: pointer;
+      border-radius: 2px;
+      transition: background 0.15s;
+      position: relative;
+    }
+
+    [data-editable]:hover { background: var(--accent-soft); }
+
+    [data-editable]:hover::after {
+      content: ' ✎';
+      font-size: 0.65rem;
+      color: var(--ink-muted);
+      opacity: 0.6;
+    }
+
+    .inline-input,
+    .inline-select,
+    .inline-textarea {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--ink);
+      background: var(--surface);
+      border: 1px solid var(--ink);
+      border-radius: 2px;
+      padding: 0.3rem 0.5rem;
+      outline: none;
+    }
+
+    .inline-textarea { resize: vertical; min-height: 60px; font-style: italic; }
+
+    .star-editor { display: flex; gap: 0.15rem; }
+    .star-editor span {
+      font-size: 1rem;
+      cursor: pointer;
+      color: #ddd;
+      transition: color 0.1s;
+      user-select: none;
+    }
+    .star-editor span.filled { color: var(--ink-muted); }
+    .star-editor:hover span { color: var(--ink-muted); }
+    .star-editor span:hover ~ span { color: #ddd !important; }
+
+    .edit-actions { display: flex; gap: 0.4rem; margin-top: 0.35rem; }
+
+    .btn-save {
+      padding: 0.22rem 0.65rem;
+      font-size: 0.65rem;
+      font-family: var(--mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: var(--ink);
+      color: white;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn-save:hover { opacity: 0.8; }
+    .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-cancel {
+      padding: 0.22rem 0.65rem;
+      font-size: 0.65rem;
+      font-family: var(--mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: transparent;
+      color: var(--ink-muted);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    .btn-cancel:hover { border-color: var(--ink-muted); }
+
+    /* DELETE BUTTON */
+    .delete-btn {
+      position: absolute;
+      top: 0.65rem;
+      right: 0.65rem;
+      background: none;
+      border: none;
+      color: #ddd;
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+      padding: 0.15rem 0.35rem;
+      border-radius: 2px;
+    }
+
+    .book-card { position: relative; }
+    .book-card:hover .delete-btn { opacity: 1; }
+    .delete-btn:hover { color: #c0392b; background: #fde8e8; }
+
+    /* TOAST */
+    #save-toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(60px);
+      background: var(--ink);
+      color: white;
+      padding: 0.55rem 1.1rem;
+      border-radius: 2px;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      pointer-events: none;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      opacity: 0;
+      z-index: 999;
+      white-space: nowrap;
+    }
+
+    #save-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    #save-toast.error { background: #c0392b; }
+  </style>
+</head>
+<body>
+
+  <!--
+    ============================================================
+    THE HTML SKELETON
+    ============================================================
+    Three main sections:
+    1. <header> — page title and description
+    2. .filter-bar — status filter buttons (built by JS)
+    3. <main> — the book grid (populated by JS)
+  -->
+
+  <!-- SAVE TOAST: slides up from bottom on save success/failure -->
+  <div id="save-toast"></div>
+
+  <header>
+    <div class="header-left">
+      <p class="header-eyebrow">Reading Log</p>
+      <h1>MY <em>BOOKS</em></h1>
+    </div>
+    <div style="text-align:right">
+      <p class="header-meta" id="header-meta">Connecting to your library…</p>
+      <!--
+        Shown after login. Lets the user clear their saved credentials
+        from localStorage — useful if they want to switch accounts.
+      -->
+      <button id="forget-btn" style="display:none;margin-top:0.5rem;background:none;border:none;font-family:var(--mono);font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:#ccc;cursor:pointer;padding:0" title="Clear saved credentials">Forget credentials</button>
+    </div>
+  </header>
+
+  <div class="filter-bar" id="filter-bar"></div>
+
+  <!-- SEARCH BAR: hidden until books load, shown in onDataLoaded() -->
+  <div class="search-wrapper" id="search-wrapper" style="display:none">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="search-input" placeholder="Search by title or author…" autocomplete="off" />
+  </div>
+
+  <!--
+    SORT BAR: also hidden until books load.
+    Each button has a data-sort attribute telling JavaScript
+    which field to sort by. This is cleaner than hardcoding
+    field names inside the JS event listeners.
+  -->
+  <div class="sort-bar" id="sort-bar" style="display:none">
+    <span class="sort-label">Sort by</span>
+    <button class="sort-btn active" data-sort="default">
+      Default <span class="sort-arrow">↓</span>
+    </button>
+    <button class="sort-btn" data-sort="Rating">
+      Rating <span class="sort-arrow">↓</span>
+    </button>
+    <button class="sort-btn" data-sort="Date Finished">
+      Date Finished <span class="sort-arrow">↓</span>
+    </button>
+    <button class="sort-btn" data-sort="Genre">
+      Genre <span class="sort-arrow">↓</span>
+    </button>
+  </div>
+
+  <main>
+    <!--
+      Config panel — only shown if the user hasn't set their credentials.
+      Once submitted, it hides and the books load.
+    -->
+    <div id="config-panel">
+      <h2>Connect Your Airtable</h2>
+      <p>
+        Enter your credentials once — they'll be saved in your browser so you
+        never have to type them again. They are stored locally on your device
+        only, never sent anywhere except directly to Airtable.
+      </p>
+      <div class="field-group">
+        <label for="input-token">Personal Access Token (starts with "pat")</label>
+        <input type="password" id="input-token" placeholder="patXXXXXXXXXXXXXX" />
+      </div>
+      <div class="field-group">
+        <label for="input-base">Base ID (starts with "app")</label>
+        <input type="text" id="input-base" placeholder="appXXXXXXXXXXXXXX" />
+      </div>
+      <button class="btn-primary" id="connect-btn">Save & Load My Books →</button>
+    </div>
+
+    <!-- Stats shown above the grid once data loads -->
+    <div id="stats-bar" style="display:none"></div>
+
+    <!-- The grid where book cards will be injected by JavaScript -->
+    <div id="books-grid"></div>
+  </main>
+
+
+  <script>
+    /*
+      ============================================================
+      STEP 9 — JAVASCRIPT: THE BRAIN
+      ============================================================
+      This is where the magic happens. The script:
+      1. Accepts credentials from the config form
+      2. Fetches ALL books from Airtable (handling pagination)
+      3. Renders each book as a card
+      4. Provides filter buttons by status
+    */
+
+    // ── Grab references to DOM elements we'll manipulate ──────────────
+    const configPanel  = document.getElementById('config-panel');
+    const connectBtn   = document.getElementById('connect-btn');
+    const booksGrid    = document.getElementById('books-grid');
+    const filterBar    = document.getElementById('filter-bar');
+    const statsBar     = document.getElementById('stats-bar');
+    const headerMeta   = document.getElementById('header-meta');
+
+    // ── State variables ───────────────────────────────────────────────
+    let allBooks     = [];   // stores every book fetched from Airtable
+    let activeFilter = 'All'; // which status filter is currently active
+    let searchQuery   = '';   // what the user has typed in the search box
+    let sortField     = 'default'; // which field we're sorting by
+    let sortDirection = 'desc';    // 'desc' = high→low/newest first, 'asc' = low→high/oldest first
+
+    // We store credentials here after login so the write function can use them
+    let airtableToken = '';
+    let airtableBase  = '';
+
+    // ── When user clicks "Load My Books" ─────────────────────────────
+    connectBtn.addEventListener('click', () => {
+      const token  = document.getElementById('input-token').value.trim();
+      const baseId = document.getElementById('input-base').value.trim();
+
+      if (!token || !baseId) {
+        alert('Please enter both your Personal Access Token and Base ID.');
+        return;
+      }
+
+      // Hide the config panel, show the loading spinner
+      configPanel.style.display = 'none';
+      showLoading();
+
+      /*
+        LOCALSTORAGE: SAVING CREDENTIALS
+        ==================================
+        localStorage is a simple key-value store built into every browser.
+        It persists across sessions — unlike regular JS variables which
+        disappear when you close the tab.
+
+        localStorage.setItem(key, value) saves a string.
+        localStorage.getItem(key) reads it back later.
+        localStorage.removeItem(key) deletes it.
+
+        The data lives only in THIS browser on THIS device.
+        It is never sent over the network — only your fetch() calls do that.
+
+        Security note: localStorage is readable by any JavaScript on the page,
+        so it's not suitable for highly sensitive apps. For a personal book
+        tracker only you use, it's a perfectly reasonable choice.
+      */
+      localStorage.setItem('bt_token', token);
+      localStorage.setItem('bt_base', baseId);
+
+      // Save credentials so the write function can use them later
+      airtableToken = token;
+      airtableBase  = baseId;
+
+      // Kick off the data fetch
+      fetchAllBooks(token, baseId);
+    });
+
+    /*
+      LOCALSTORAGE: LOADING SAVED CREDENTIALS ON PAGE OPEN
+      ======================================================
+      When the page loads, we check localStorage immediately.
+      If credentials are already saved, we skip the login form
+      entirely and go straight to fetching books.
+
+      This runs once, right when the script starts.
+    */
+    const savedToken = localStorage.getItem('bt_token');
+    const savedBase  = localStorage.getItem('bt_base');
+
+    if (savedToken && savedBase) {
+      // Pre-fill the inputs (helpful if auto-load fails)
+      document.getElementById('input-token').value = savedToken;
+      document.getElementById('input-base').value  = savedBase;
+
+      // Skip the form — load immediately
+      configPanel.style.display = 'none';
+      showLoading();
+      airtableToken = savedToken;
+      airtableBase  = savedBase;
+      fetchAllBooks(savedToken, savedBase);
+    }
+
+    /*
+      FORGET CREDENTIALS BUTTON
+      ==========================
+      Clears localStorage and reloads the page, bringing back the
+      login form. Useful if credentials change or something breaks.
+    */
+    document.getElementById('forget-btn').addEventListener('click', () => {
+      if (confirm('Clear saved credentials? You\'ll need to enter them again.')) {
+        localStorage.removeItem('bt_token');
+        localStorage.removeItem('bt_base');
+        location.reload();
+      }
+    });
+
+
+    /*
+      ============================================================
+      FETCHING FROM AIRTABLE
+      ============================================================
+      Airtable's API returns records in pages of up to 100 at a time.
+      If there are more records, it sends back an "offset" value.
+      We keep fetching in a loop until there's no more offset.
+
+      This pattern is called "pagination" — very common in APIs.
+    */
+    async function fetchAllBooks(token, baseId) {
+      const TABLE_NAME = 'tbl6yoJCp3zqIhKgZ'; // using table ID directly // must match your Airtable table name exactly
+      // encodeURIComponent handles spaces and special chars in the table name
+      const baseUrl = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(TABLE_NAME)}`;
+
+      const headers = {
+        // Authorization header is how we prove who we are to Airtable
+        'Authorization': `Bearer ${token}`
+      };
+
+      let allRecords = [];
+      let offset     = null; // starts null, gets set if there are more pages
+
+      try {
+        // Keep looping until we've fetched every page
+        do {
+          // Build the URL — append offset if we have one
+          const url = offset ? `${baseUrl}?offset=${offset}` : baseUrl;
+
+          /*
+            fetch() is the browser's built-in HTTP client.
+            'await' pauses here until the server responds —
+            without blocking the browser UI.
+          */
+          const response = await fetch(url, { headers });
+
+          if (!response.ok) {
+            // response.ok is false for 4xx/5xx HTTP errors
+            const err = await response.json();
+            throw new Error(err.error?.message || `HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          // data.records is the array of book records for this page
+          allRecords = allRecords.concat(data.records);
+
+          // If Airtable gives us an offset, there are more pages
+          offset = data.offset || null;
+
+        } while (offset); // keep going while there's a next page
+
+        // All pages fetched! Save and render.
+        allBooks = allRecords;
+        onDataLoaded();
+
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+
+    /*
+      ============================================================
+      AFTER DATA LOADS
+      ============================================================
+    */
+    function onDataLoaded() {
+      // Update the header subtitle with total count
+      headerMeta.textContent = `${allBooks.length} book${allBooks.length !== 1 ? 's' : ''} in your library`;
+
+      // Build filter buttons from the unique statuses found in data
+      buildFilters();
+
+      // Show the stats bar, search box, sort bar, and add button
+      statsBar.style.display = 'flex';
+      document.getElementById('search-wrapper').style.display = 'block';
+      document.getElementById('sort-bar').style.display = 'flex';
+      document.getElementById('add-book-btn').style.display = 'flex';
+      document.getElementById('forget-btn').style.display = 'block';
+
+      /*
+        MODAL WIRING — done here (inside onDataLoaded) rather than at
+        the top of the script, because the modal HTML lives AFTER the
+        <script> tag in the file. If we tried to get those elements at
+        script-parse time they wouldn't exist yet and getElementById
+        would return null, causing the "Cannot read properties of null" error.
+        By wiring it up here, we know the full page has already loaded.
+      */
+      const addModal   = document.getElementById('add-modal');
+      const addBtn     = document.getElementById('add-book-btn');
+      const modalClose = document.getElementById('modal-close');
+
+      addBtn.addEventListener('click', () => addModal.classList.add('open'));
+      modalClose.addEventListener('click', () => addModal.classList.remove('open'));
+      addModal.addEventListener('click', (e) => {
+        if (e.target === addModal) addModal.classList.remove('open');
+      });
+
+      document.getElementById('modal-save-btn').addEventListener('click', handleAddBook);
+
+      /*
+        ============================================================
+        OPEN LIBRARY LOOKUP
+        ============================================================
+        Open Library (openlibrary.org) is a free, open database of
+        books run by the Internet Archive. It has a public API that
+        requires no API key — anyone can use it.
+
+        The search endpoint is:
+          GET https://openlibrary.org/search.json?q=...
+          or  https://openlibrary.org/search.json?isbn=...
+
+        It returns a JSON object with a "docs" array of book matches.
+        Each doc has fields like: title, author_name, first_publish_year,
+        subject (genres), isbn.
+
+        We detect whether the input looks like an ISBN (all digits,
+        10 or 13 characters) and use the isbn= param for precision.
+        Otherwise we use q= for a general search.
+      */
+      document.getElementById('lookup-btn').addEventListener('click', async () => {
+        const query  = document.getElementById('lookup-input').value.trim();
+        const status = document.getElementById('lookup-status');
+
+        if (!query) {
+          status.textContent = 'Please enter a title, author or ISBN.';
+          status.className   = 'lookup-status error';
+          return;
+        }
+
+        // Show loading state
+        const btn = document.getElementById('lookup-btn');
+        btn.disabled    = true;
+        btn.textContent = 'Searching…';
+        status.textContent = 'Looking up on Open Library…';
+        status.className   = 'lookup-status loading';
+
+        try {
+          /*
+            Detect ISBN: strip spaces/dashes, check if it's 10 or 13 digits.
+            ISBNs are unique per edition so they give the most precise match.
+          */
+          const cleaned  = query.replace(/[\s-]/g, '');
+          const isIsbn   = /^\d{10}$|^\d{13}$/.test(cleaned);
+          const apiUrl   = isIsbn
+            ? `https://openlibrary.org/search.json?isbn=${cleaned}&limit=1`
+            : `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=1`;
+
+          /*
+            fetch() works the same way here as it does for Airtable —
+            same function, different URL. This is the power of APIs:
+            one tool, many services.
+          */
+          const response = await fetch(apiUrl);
+
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+          const data = await response.json();
+
+          if (!data.docs || data.docs.length === 0) {
+            status.textContent = 'No results found. Try a different search or fill in manually.';
+            status.className   = 'lookup-status error';
+            return;
+          }
+
+          /*
+            data.docs[0] is the best match.
+            We pick the fields we want and populate the form.
+            Not every book has every field, so we use || '' as fallbacks.
+          */
+          const book = data.docs[0];
+
+          // Title
+          if (book.title) {
+            document.getElementById('new-title').value = book.title;
+          }
+
+          // Author — Open Library returns an array of authors
+          if (book.author_name && book.author_name.length > 0) {
+            document.getElementById('new-author').value = book.author_name[0];
+          }
+
+          // Publication year
+          if (book.first_publish_year) {
+            document.getElementById('new-year').value = book.first_publish_year;
+          }
+
+          /*
+            Genre — Open Library uses "subject" for this.
+            It's a long array like ["Fiction", "Adventure", "Space opera", ...]
+            We take the first subject that looks like a clean genre (short, no
+            commas) rather than a descriptive tag.
+          */
+          if (book.subject && book.subject.length > 0) {
+            const genre = book.subject.find(s => s.length < 30 && !s.includes(',')) || book.subject[0];
+            document.getElementById('new-genre').value = genre;
+          }
+
+          /*
+            ISBN — store it for reference. Open Library returns an array;
+            we prefer the 13-digit version (ISBN-13) if available.
+          */
+          if (book.isbn && book.isbn.length > 0) {
+            const isbn13 = book.isbn.find(i => i.length === 13) || book.isbn[0];
+            // We don't have an ISBN field in the modal but it goes into the
+            // new-isbn hidden field if it exists, or we just skip it.
+            const isbnField = document.getElementById('new-isbn');
+            if (isbnField) isbnField.value = isbn13;
+          }
+
+          status.textContent = `✓ Found: "${book.title}"${book.author_name ? ' by ' + book.author_name[0] : ''}. Check the fields below and adjust if needed.`;
+          status.className   = 'lookup-status success';
+
+        } catch (err) {
+          status.textContent = '⚠ Lookup failed: ' + err.message;
+          status.className   = 'lookup-status error';
+        } finally {
+          btn.disabled    = false;
+          btn.textContent = 'Look up →';
+        }
+      });
+
+      // Also trigger lookup on Enter key in the lookup input
+      document.getElementById('lookup-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('lookup-btn').click();
+      });
+
+      /*
+        SEARCH: HOW IT WORKS
+        =====================
+        We listen for the 'input' event on the search box.
+        'input' fires on EVERY keystroke — so the results update
+        in real time as the user types, with no button needed.
+
+        Each time it fires, we:
+        1. Read the current value and lowercase it
+        2. Store it in our searchQuery variable
+        3. Call applyFilters() which combines search + status filter
+      */
+      document.getElementById('search-input').addEventListener('input', (event) => {
+        searchQuery = event.target.value.toLowerCase().trim();
+        applyFilters();
+      });
+
+      /*
+        SORT: HOW IT WORKS
+        ==================
+        We select ALL sort buttons at once using querySelectorAll,
+        then loop over them and attach a click listener to each.
+
+        When clicked, a button tells us two things via data attributes:
+        - data-sort: which field to sort by (e.g. "Rating")
+
+        If the user clicks the SAME button twice, we flip the direction
+        between 'desc' and 'asc'. This is called a toggle.
+
+        After updating our state variables, we call applyFilters()
+        which already handles filtering — we just add sorting inside it.
+      */
+      document.querySelectorAll('.sort-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const clicked = btn.dataset.sort; // reads the data-sort attribute
+
+          if (sortField === clicked) {
+            // Same button clicked again — flip the direction
+            sortDirection = sortDirection === 'desc' ? 'asc' : 'desc';
+          } else {
+            // New button clicked — switch field, reset to default direction
+            sortField = clicked;
+            sortDirection = clicked === 'Genre' ? 'asc' : 'desc';
+            // Genre defaults to asc (A→Z makes more sense than Z→A)
+          }
+
+          // Update button visual states
+          document.querySelectorAll('.sort-btn').forEach(b => {
+            b.classList.remove('active');
+            // Hide arrows on inactive buttons
+            b.querySelector('.sort-arrow').style.opacity = '0.3';
+          });
+          btn.classList.add('active');
+          const arrow = btn.querySelector('.sort-arrow');
+          arrow.style.opacity = '1';
+          // Toggle the 'asc' class which CSS uses to flip the arrow
+          arrow.classList.toggle('asc', sortDirection === 'asc');
+
+          applyFilters();
+        });
+      });
+
+      // Render all books on first load
+      renderBooks(allBooks);
+    }
+
+
+    /*
+      ============================================================
+      APPLYING FILTERS
+      ============================================================
+      This is the key function that combines BOTH filters:
+      the status buttons AND the search box.
+
+      The logic is:
+        start with ALL books
+        → keep only those matching the active status filter
+        → then keep only those matching the search query
+
+      This is called "chaining" filters. Each step narrows
+      the array down further.
+
+      .filter() is a JavaScript array method that returns a NEW
+      array containing only the items where the function returns
+      true. The original allBooks array is never modified —
+      we always filter from the full list.
+    */
+    function applyFilters() {
+      let results = allBooks;
+
+      // Step 1: apply status filter (if not "All")
+      if (activeFilter !== 'All') {
+        results = results.filter(b => b.fields['Status'] === activeFilter);
+      }
+
+      // Step 2: apply search filter (if query is not empty)
+      if (searchQuery) {
+        results = results.filter(b => {
+          const title  = (b.fields['Title']  || '').toLowerCase();
+          const author = (b.fields['Author'] || '').toLowerCase();
+
+          /*
+            .includes() checks if a string contains another string.
+            We check if title OR author includes the search query.
+            The || means "or" — either match counts.
+          */
+          return title.includes(searchQuery) || author.includes(searchQuery);
+        });
+      }
+
+      /*
+        STEP 3: SORT
+        ============
+        .sort() rearranges an array in place based on a comparator
+        function. The comparator receives two items (a, b) and must
+        return:
+          • a negative number → put a before b
+          • a positive number → put b before a
+          • 0 → leave them in the same order
+
+        We use [...results] (spread into a new array) before sorting
+        because .sort() mutates the original array — we don't want
+        to accidentally scramble allBooks.
+
+        For numbers (Rating): subtracting a - b sorts ascending.
+        For dates: we convert to timestamps (numbers) then subtract.
+        For strings (Genre): localeCompare() handles alphabetical
+        sorting correctly across different languages/characters.
+
+        The direction multiplier (-1 or 1) flips the result:
+        multiplying by -1 reverses the order.
+      */
+      if (sortField !== 'default') {
+        const dir = sortDirection === 'asc' ? 1 : -1;
+
+        results = [...results].sort((a, b) => {
+          const aVal = a.fields[sortField];
+          const bVal = b.fields[sortField];
+
+          // Always push books with no value for this field to the bottom
+          if (aVal == null && bVal == null) return 0;
+          if (aVal == null) return 1;
+          if (bVal == null) return -1;
+
+          if (sortField === 'Rating') {
+            // Numbers: simple subtraction
+            return (aVal - bVal) * dir;
+          }
+
+          if (sortField === 'Date Finished') {
+            // Dates: convert ISO strings to timestamps (milliseconds)
+            // so we can subtract them like numbers
+            return (new Date(aVal) - new Date(bVal)) * dir;
+          }
+
+          if (sortField === 'Genre') {
+            // Strings: localeCompare returns -1, 0, or 1
+            return aVal.localeCompare(bVal) * dir;
+          }
+
+          return 0;
+        });
+      }
+
+      renderBooks(results);
+    }
+
+
+    /*
+      ============================================================
+      BUILDING FILTER BUTTONS
+      ============================================================
+      We scan all books, collect unique Status values, and create
+      a button for each. This is dynamic — works with any statuses.
+    */
+    function buildFilters() {
+      // Use a Set to collect unique status values (Sets auto-deduplicate)
+      const statuses = new Set();
+      allBooks.forEach(book => {
+        const s = book.fields['Status'];
+        if (s) statuses.add(s);
+      });
+
+      // "All" button always comes first
+      const buttons = ['All', ...statuses];
+
+      filterBar.innerHTML = ''; // clear any previous buttons
+
+      buttons.forEach(status => {
+        const btn = document.createElement('button');
+        btn.className = 'filter-btn' + (status === 'All' ? ' active' : '');
+        btn.textContent = status;
+
+        btn.addEventListener('click', () => {
+          // Update which button looks active
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          activeFilter = status;
+
+          // Use applyFilters() so search + status work together
+          applyFilters();
+        });
+
+        filterBar.appendChild(btn);
+      });
+    }
+
+
+    /*
+      ============================================================
+      RENDERING BOOK CARDS
+      ============================================================
+      This function takes an array of Airtable records and turns
+      each one into a card element in the DOM.
+    */
+    function renderBooks(books) {
+      booksGrid.innerHTML = ''; // clear the grid first
+
+      // Update stats bar
+      updateStats(books);
+
+      if (books.length === 0) {
+        booksGrid.innerHTML = '<div id="state-message"><p>No books found for this filter.</p></div>';
+        return;
+      }
+
+      books.forEach((record, index) => {
+        /*
+          Each Airtable record has an "id" and a "fields" object.
+          The keys in fields match your column names exactly.
+        */
+        const f = record.fields;
+
+        const card = document.createElement('div');
+        card.className = 'book-card';
+        // Stagger the animation: each card delays by 50ms more than the last
+        card.style.animationDelay = `${index * 50}ms`;
+
+        // Build star rating display from the numeric Rating field
+        const stars = renderStars(f['Rating']);
+
+        // Format dates nicely (Airtable sends ISO format: "2024-03-15")
+        const started  = formatDate(f['Date Started']);
+        const finished = formatDate(f['Date Finished']);
+
+        /*
+          Template literals (backticks) let us write multi-line HTML
+          strings with embedded JS expressions using ${ }.
+          This is much cleaner than concatenating strings.
+        */
+        card.innerHTML = `
+          <!--
+            DELETE BUTTON — hidden until card is hovered (CSS handles that).
+            data-record-id lets the JS know which record to delete.
+          -->
+          <button class="delete-btn" data-record-id="${record.id}" title="Delete book">✕ Delete</button>
+
+          <div class="card-header">
+            <div>
+              <div class="book-title">${escape(f['Title'] || 'Untitled')}</div>
+              <div class="book-author">${escape(f['Author'] || '—')}</div>
+            </div>
+            <!--
+              data-editable="Status" marks this element as clickable to edit.
+              data-record-id stores the Airtable record ID so we know WHICH
+              record to update when the user saves. data-field tells us WHICH
+              field to write to. These data attributes are how JS and HTML
+              communicate without global variables.
+            -->
+            <span
+              class="status-badge"
+              data-status="${escape(f['Status'] || '')}"
+              data-editable="Status"
+              data-record-id="${record.id}"
+              data-field="Status"
+              title="Click to edit"
+            >${escape(f['Status'] || 'Set status')}</span>
+          </div>
+
+          <!--
+            Rating is editable too. We render the stars as before,
+            but wrap them in a div with data-editable so clicking
+            activates the star editor.
+          -->
+          <div
+            class="rating"
+            data-editable="Rating"
+            data-record-id="${record.id}"
+            data-field="Rating"
+            title="Click to edit"
+          >${stars || '<span style="color:var(--ink-muted);font-size:0.8rem">Rate this book</span>'}</div>
+
+          <div class="card-divider"></div>
+
+          <div class="book-meta">
+            ${f['Genre']            ? `<div class="meta-item"><span class="meta-label">Genre</span><span class="meta-value">${escape(f['Genre'])}</span></div>` : ''}
+            ${f['Publication Year'] ? `<div class="meta-item"><span class="meta-label">Published</span><span class="meta-value">${f['Publication Year']}</span></div>` : ''}
+            ${started               ? `<div class="meta-item"><span class="meta-label">Started</span><span class="meta-value">${started}</span></div>` : ''}
+            <div class="meta-item">
+              <span class="meta-label">Finished</span>
+              <span
+                class="meta-value"
+                data-editable="Date Finished"
+                data-record-id="${record.id}"
+                data-field="Date Finished"
+                title="Click to edit"
+              >${finished || '<span style="color:var(--ink-muted)">Set date</span>'}</span>
+            </div>
+            ${f['ISBN']             ? `<div class="meta-item"><span class="meta-label">ISBN</span><span class="meta-value">${escape(f['ISBN'])}</span></div>` : ''}
+          </div>
+
+          <!--
+            Notes is editable. We show a placeholder if empty.
+          -->
+          <div
+            class="book-notes"
+            data-editable="Notes"
+            data-record-id="${record.id}"
+            data-field="Notes"
+            title="Click to add notes"
+          >${f['Notes'] ? escape(f['Notes']) : '<span style="color:var(--ink-muted);font-style:normal;font-size:0.78rem">Add notes…</span>'}</div>
+        `;
+
+        booksGrid.appendChild(card);
+      });
+    }
+
+
+    /*
+      ============================================================
+      HELPER FUNCTIONS
+      ============================================================
+    */
+
+    // Convert a numeric rating (e.g. 4) into star characters
+    function renderStars(rating) {
+      if (!rating) return '';
+      const max = 5;
+      const filled = Math.round(rating);
+      return '★'.repeat(filled) + '☆'.repeat(max - filled);
+    }
+
+    // Convert ISO date string to a readable format
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      // new Date() parses "2024-03-15" → we format it as "Mar 15, 2024"
+      return new Date(dateStr).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric'
+      });
+    }
+
+    /*
+      IMPORTANT SECURITY NOTE:
+      Always escape user-provided text before inserting into HTML.
+      This prevents XSS (Cross-Site Scripting) attacks where malicious
+      text could inject harmful code into your page.
+    */
+    function escape(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Update the little stats row above the grid
+    function updateStats(books) {
+      const total    = books.length;
+      const read     = books.filter(b => b.fields['Status'] === 'Read').length;
+      const reading  = books.filter(b => b.fields['Status'] === 'Reading').length;
+      const rated    = books.filter(b => b.fields['Rating']);
+      const avgRating = rated.length
+        ? (rated.reduce((sum, b) => sum + b.fields['Rating'], 0) / rated.length).toFixed(1)
+        : null;
+
+      statsBar.innerHTML = `
+        <span>Showing <strong>${total}</strong> books</span>
+        <span><strong>${read}</strong> read</span>
+        <span><strong>${reading}</strong> in progress</span>
+        ${avgRating ? `<span>Avg rating: <strong>${avgRating} ★</strong></span>` : ''}
+      `;
+    }
+
+    /*
+      ============================================================
+      INLINE EDITING — EVENT DELEGATION
+      ============================================================
+      Instead of attaching a click listener to every individual
+      editable element, we attach ONE listener to the grid and
+      let clicks "bubble up" to it. We then check if the clicked
+      element has data-editable. This pattern is called
+      "event delegation" — it's more efficient and works even
+      for elements added to the DOM later.
+    */
+    booksGrid.addEventListener('click', (event) => {
+      // Walk up the DOM from the clicked element to find the editable target
+      const target = event.target.closest('[data-editable]');
+      if (!target) return; // click wasn't on an editable field
+
+      // If this field is already in edit mode, don't open it again
+      if (target.querySelector('.inline-input, .inline-select, .inline-textarea, .star-editor')) return;
+
+      const field    = target.dataset.field;
+      const recordId = target.dataset.recordId;
+      const book     = allBooks.find(b => b.id === recordId);
+      if (!book) return;
+
+      const currentValue = book.fields[field];
+
+      // Save the original HTML so we can restore it on Cancel
+      const originalHTML = target.innerHTML;
+
+      /*
+        BUILD THE APPROPRIATE INPUT for each field type.
+        Each field type needs a different input:
+        - Status → <select> dropdown (fixed set of options)
+        - Rating → clickable stars
+        - Date Finished → <input type="date">
+        - Notes → <textarea>
+      */
+      let editorHTML = '';
+
+      if (field === 'Status') {
+        const options = ['Want to read', 'Reading', 'Finished', 'Abandoned'];
+        editorHTML = `
+          <select class="inline-select">
+            ${options.map(o => `<option value="${o}" ${currentValue === o ? 'selected' : ''}>${o}</option>`).join('')}
+          </select>`;
+      }
+
+      else if (field === 'Rating') {
+        const current = currentValue || 0;
+        // Build 5 star spans. data-value tells us which star was clicked.
+        editorHTML = `<div class="star-editor">
+          ${[1,2,3,4,5].map(n =>
+            `<span data-value="${n}" class="${n <= current ? 'filled' : ''}">★</span>`
+          ).join('')}
+        </div>`;
+      }
+
+      else if (field === 'Date Finished') {
+        // <input type="date"> gives us a native date picker.
+        // Airtable stores dates as "YYYY-MM-DD" which is exactly
+        // what the date input expects — no conversion needed.
+        editorHTML = `<input type="date" class="inline-input" value="${currentValue || ''}" />`;
+      }
+
+      else if (field === 'Notes') {
+        editorHTML = `<textarea class="inline-textarea">${currentValue || ''}</textarea>`;
+      }
+
+      // Inject the editor + Save/Cancel buttons into the card
+      target.innerHTML = `
+        ${editorHTML}
+        <div class="edit-actions">
+          <button class="btn-save">Save</button>
+          <button class="btn-cancel">Cancel</button>
+        </div>
+      `;
+
+      // Auto-focus the input so the user can start typing immediately
+      const input = target.querySelector('input, select, textarea');
+      if (input) input.focus();
+
+      /*
+        STAR EDITOR: hover and click logic.
+        We handle stars separately because they're not a standard
+        input — they're spans we've turned into an interactive widget.
+      */
+      if (field === 'Rating') {
+        const starEditor = target.querySelector('.star-editor');
+        let pendingRating = currentValue || 0;
+
+        // Highlight stars up to the hovered one
+        starEditor.addEventListener('mouseover', (e) => {
+          const hovered = e.target.closest('span[data-value]');
+          if (!hovered) return;
+          const val = parseInt(hovered.dataset.value);
+          starEditor.querySelectorAll('span').forEach((s, i) => {
+            s.classList.toggle('filled', i < val);
+          });
+        });
+
+        // Reset to selected rating when mouse leaves
+        starEditor.addEventListener('mouseleave', () => {
+          starEditor.querySelectorAll('span').forEach((s, i) => {
+            s.classList.toggle('filled', i < pendingRating);
+          });
+        });
+
+        // Lock in the clicked star as the pending value
+        starEditor.addEventListener('click', (e) => {
+          const star = e.target.closest('span[data-value]');
+          if (!star) return;
+          pendingRating = parseInt(star.dataset.value);
+        });
+
+        // Attach save handler that reads pendingRating
+        target.querySelector('.btn-save').addEventListener('click', async () => {
+          await saveField(target, recordId, field, pendingRating, originalHTML);
+        });
+      } else {
+        // For all other field types, read value from the input/select/textarea
+        target.querySelector('.btn-save').addEventListener('click', async () => {
+          const inputEl = target.querySelector('input, select, textarea');
+          const newValue = inputEl.value;
+          await saveField(target, recordId, field, newValue, originalHTML);
+        });
+      }
+
+      // Cancel: restore the original display without saving
+      target.querySelector('.btn-cancel').addEventListener('click', () => {
+        target.innerHTML = originalHTML;
+      });
+    });
+
+
+    /*
+      ============================================================
+      SAVING TO AIRTABLE — THE WRITE API CALL
+      ============================================================
+      This is the key new concept: a PATCH request.
+
+      So far we've only used GET (fetch data).
+      Now we use PATCH (update specific fields on an existing record).
+
+      The Airtable PATCH endpoint is:
+        PATCH /v0/{baseId}/{tableId}/{recordId}
+        Body: { fields: { "Field Name": newValue } }
+
+      We only send the field that changed — Airtable leaves
+      everything else untouched.
+
+      async/await: saveField is an async function, meaning it
+      can "pause" while waiting for the network response without
+      freezing the browser. The await keyword marks those pauses.
+    */
+    async function saveField(target, recordId, field, newValue, originalHTML) {
+      const saveBtn = target.querySelector('.btn-save');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+
+      // Airtable expects null to clear a field, not an empty string
+      const valueToSend = (newValue === '' || newValue === null) ? null : newValue;
+
+      // For Rating, ensure we send a number not a string
+      const finalValue = field === 'Rating' ? Number(valueToSend) : valueToSend;
+
+      try {
+        const response = await fetch(
+          `https://api.airtable.com/v0/${airtableBase}/tbl6yoJCp3zqIhKgZ/${recordId}`,
+          {
+            method: 'PATCH', // PATCH = update specific fields (vs PUT = replace whole record)
+            headers: {
+              'Authorization': `Bearer ${airtableToken}`,
+              'Content-Type': 'application/json', // tells Airtable we're sending JSON
+            },
+            body: JSON.stringify({
+              fields: {
+                [field]: finalValue  // [field] is a computed property key — uses the variable value
+              }
+            })
+          }
+        );
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error?.message || `HTTP ${response.status}`);
+        }
+
+        const updated = await response.json();
+
+        /*
+          UPDATE LOCAL DATA
+          After a successful save, we update our local allBooks array
+          to reflect the new value. This keeps our in-memory data in
+          sync with Airtable without needing to re-fetch everything.
+        */
+        const bookIndex = allBooks.findIndex(b => b.id === recordId);
+        if (bookIndex !== -1) {
+          allBooks[bookIndex].fields[field] = updated.fields[field];
+        }
+
+        showToast('✓ Saved');
+
+        // Re-render the grid so the card reflects the new value
+        applyFilters();
+
+      } catch (err) {
+        showToast('⚠ Save failed: ' + err.message, true);
+        // Restore original display on failure
+        target.innerHTML = originalHTML;
+      }
+    }
+
+
+    /*
+      TOAST NOTIFICATION
+      Shows a small pill at the bottom of the screen, then fades out.
+      setTimeout schedules the hide after 2.5 seconds.
+    */
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('save-toast');
+      toast.textContent = message;
+      toast.classList.toggle('error', isError);
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+
+    /*
+      ============================================================
+      ADD BOOK — CREATE (POST request)
+      ============================================================
+      Creating a new record uses POST (not PATCH).
+      POST means "create something new."
+      PATCH means "update something existing."
+      DELETE means "remove something."
+
+      These are the four main HTTP verbs you'll encounter:
+      GET    → read
+      POST   → create
+      PATCH  → update (partial)
+      DELETE → remove
+    */
+    async function handleAddBook() {
+      const addModal = document.getElementById('add-modal');
+      const title  = document.getElementById('new-title').value.trim();
+      const author = document.getElementById('new-author').value.trim();
+
+      if (!title || !author) {
+        showToast('⚠ Title and Author are required', true);
+        return;
+      }
+
+      const saveBtn = document.getElementById('modal-save-btn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Adding…';
+
+      // Build the fields object — only include fields that have values
+      const fields = { Title: title, Author: author };
+
+      const status  = document.getElementById('new-status').value;
+      const genre   = document.getElementById('new-genre').value.trim();
+      const year    = document.getElementById('new-year').value;
+      const rating  = document.getElementById('new-rating').value;
+      const started = document.getElementById('new-started').value;
+      const finished= document.getElementById('new-finished').value;
+      const notes   = document.getElementById('new-notes').value.trim();
+
+      if (status)  fields['Status']           = status;
+      if (genre)   fields['Genre']            = genre;
+      if (year)    fields['Publication Year'] = parseInt(year);
+      if (rating)  fields['Rating']           = parseInt(rating);
+      if (started) fields['Date Started']     = started;
+      if (finished)fields['Date Finished']    = finished;
+      if (notes)   fields['Notes']            = notes;
+
+      const isbn = document.getElementById('new-isbn').value.trim();
+      if (isbn)    fields['ISBN']             = isbn;
+
+      try {
+        const response = await fetch(
+          `https://api.airtable.com/v0/${airtableBase}/tbl6yoJCp3zqIhKgZ`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${airtableToken}`,
+              'Content-Type': 'application/json',
+            },
+            /*
+              Airtable's create endpoint wraps fields in a "records" array.
+              This is because the API supports creating multiple records
+              at once — we're just creating one here.
+            */
+            body: JSON.stringify({ records: [{ fields }] })
+          }
+        );
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error?.message || `HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const newRecord = data.records[0];
+
+        // Add the new record to our local array so it appears immediately
+        allBooks.unshift(newRecord); // unshift adds to the FRONT of the array
+
+        // Close modal and reset the form
+        addModal.classList.remove('open');
+        document.getElementById('new-title').value   = '';
+        document.getElementById('new-author').value  = '';
+        document.getElementById('new-genre').value   = '';
+        document.getElementById('new-year').value    = '';
+        document.getElementById('new-rating').value  = '';
+        document.getElementById('new-started').value = '';
+        document.getElementById('new-finished').value= '';
+        document.getElementById('new-notes').value   = '';
+        document.getElementById('new-isbn').value    = '';
+        document.getElementById('lookup-input').value = '';
+        document.getElementById('lookup-status').textContent = '';
+        document.getElementById('lookup-status').className   = 'lookup-status';
+
+        showToast('✓ Book added');
+        applyFilters();
+
+      } catch (err) {
+        showToast('⚠ Could not add book: ' + err.message, true);
+      } finally {
+        /*
+          'finally' runs whether the try succeeded or the catch failed.
+          It's the right place to re-enable the button either way.
+        */
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Add Book';
+      }
+    }
+
+
+    /*
+      ============================================================
+      DELETE A BOOK — DELETE request
+      ============================================================
+      We use event delegation again (one listener on the grid)
+      to catch clicks on any delete button.
+
+      We show a confirmation dialog first — deleting is permanent
+      and can't be undone, so it's good practice to ask.
+      window.confirm() is the simplest built-in way to do this.
+    */
+    booksGrid.addEventListener('click', async (e) => {
+      const deleteBtn = e.target.closest('.delete-btn');
+      if (!deleteBtn) return;
+
+      // Stop the click from also triggering the inline edit handler
+      e.stopPropagation();
+
+      const recordId = deleteBtn.dataset.recordId;
+      const book = allBooks.find(b => b.id === recordId);
+      const title = book?.fields['Title'] || 'this book';
+
+      // Ask for confirmation before doing anything irreversible
+      const confirmed = window.confirm(`Delete "${title}"? This cannot be undone.`);
+      if (!confirmed) return;
+
+      deleteBtn.textContent = '…';
+      deleteBtn.disabled = true;
+
+      try {
+        const response = await fetch(
+          `https://api.airtable.com/v0/${airtableBase}/tbl6yoJCp3zqIhKgZ/${recordId}`,
+          {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${airtableToken}` }
+            // DELETE requests don't need a body
+          }
+        );
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error?.message || `HTTP ${response.status}`);
+        }
+
+        // Remove from local array using .filter() — keep everything EXCEPT this record
+        allBooks = allBooks.filter(b => b.id !== recordId);
+
+        showToast('✓ Book deleted');
+        applyFilters();
+
+      } catch (err) {
+        showToast('⚠ Could not delete: ' + err.message, true);
+        deleteBtn.textContent = '✕ Delete';
+        deleteBtn.disabled = false;
+      }
+    });
+
+
+    // Render a loading spinner inside the grid
+    function showLoading() {
+      booksGrid.innerHTML = `
+        <div id="state-message">
+          <div class="spinner"></div>
+          <p>Fetching your library…</p>
+        </div>
+      `;
+    }
+
+    // Render an error message inside the grid
+    function showError(msg) {
+      headerMeta.textContent = 'Connection failed';
+      booksGrid.innerHTML = `
+        <div id="state-message">
+          <p class="error-msg">⚠ Could not load books</p>
+          <p style="margin-top:0.5rem; font-size:0.85rem">${escape(msg)}</p>
+          <p style="margin-top:1rem; font-size:0.8rem; color:var(--ink-muted)">
+            Check your token, Base ID, and table name, then reload the page.
+          </p>
+        </div>
+      `;
+      // Show config panel again so user can retry
+      configPanel.style.display = 'block';
+      configPanel.style.marginTop = '2rem';
+    }
+  </script>
+  <!-- FLOATING ADD BUTTON — visible after login -->
+  <button id="add-book-btn" title="Add a book">+</button>
+
+  <!--
+    ADD BOOK MODAL
+    Hidden by default. The .open class is toggled by JS.
+    Clicking the overlay background closes it.
+  -->
+  <div class="modal-overlay" id="add-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>Add a Book</h2>
+        <button class="modal-close" id="modal-close">✕</button>
+      </div>
+
+      <!--
+        LOOKUP BAR
+        The user pastes a title, author, or ISBN here.
+        Clicking "Look up" fires a request to the Open Library API.
+        If a match is found, the fields below are filled automatically.
+        The user can then correct anything before saving.
+      -->
+      <div class="lookup-bar">
+        <input
+          type="text"
+          id="lookup-input"
+          placeholder="Search by title, author or ISBN…"
+          autocomplete="off"
+        />
+        <button class="btn-lookup" id="lookup-btn">Look up →</button>
+      </div>
+      <div class="lookup-status" id="lookup-status"></div>
+
+      <div class="modal-divider">or fill in manually</div>
+
+      <div class="modal-grid">
+        <div class="field-group full">
+          <label>Title *</label>
+          <input type="text" id="new-title" placeholder="e.g. Dune" />
+        </div>
+        <div class="field-group full">
+          <label>Author *</label>
+          <input type="text" id="new-author" placeholder="e.g. Frank Herbert" />
+        </div>
+        <div class="field-group">
+          <label>Status</label>
+          <select id="new-status">
+            <option value="Want to read">Want to read</option>
+            <option value="Reading">Reading</option>
+            <option value="Finished">Finished</option>
+            <option value="Abandoned">Abandoned</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>Genre</label>
+          <input type="text" id="new-genre" placeholder="e.g. Sci-Fi" />
+        </div>
+        <div class="field-group">
+          <label>Publication Year</label>
+          <input type="number" id="new-year" placeholder="e.g. 1965" />
+        </div>
+        <div class="field-group">
+          <label>Rating (1–5)</label>
+          <input type="number" id="new-rating" min="1" max="5" placeholder="e.g. 4" />
+        </div>
+        <div class="field-group">
+          <label>Date Started</label>
+          <input type="date" id="new-started" />
+        </div>
+        <div class="field-group">
+          <label>Date Finished</label>
+          <input type="date" id="new-finished" />
+        </div>
+        <div class="field-group full">
+          <label>Notes</label>
+          <textarea id="new-notes" placeholder="Your thoughts…" style="height:70px;resize:vertical"></textarea>
+        </div>
+        <div class="field-group full">
+          <label>ISBN</label>
+          <input type="text" id="new-isbn" placeholder="Auto-filled from lookup" />
+        </div>
+      </div>
+
+      <button class="btn-primary" id="modal-save-btn" style="margin-top:1.25rem">Add Book</button>
+    </div>
+  </div>
+
+</body>
+</html>

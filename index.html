@@ -822,27 +822,41 @@
 
     .btn-cancel:hover { border-color: var(--ink-muted); }
 
-    /* DELETE BUTTON */
+    /* DELETE BUTTON — sits at the bottom of the card, revealed on hover */
     .delete-btn {
-      position: absolute;
-      top: 0.65rem;
-      right: 0.65rem;
+      display: block;
+      width: calc(100% + 2.8rem); /* bleed to card edges */
+      margin: 0.25rem -1.4rem -1.4rem; /* pull to bottom edge */
+      padding: 0.55rem 1.4rem;
       background: none;
       border: none;
-      color: #ddd;
+      border-top: 1px solid transparent;
+      color: transparent; /* invisible until hover */
       font-family: var(--mono);
-      font-size: 0.62rem;
-      letter-spacing: 0.04em;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-align: center;
       cursor: pointer;
-      opacity: 0;
-      transition: opacity 0.15s, color 0.15s;
-      padding: 0.15rem 0.35rem;
-      border-radius: 2px;
+      transition: all 0.15s ease;
+      border-radius: 0 0 4px 4px;
     }
 
     .book-card { position: relative; }
-    .book-card:hover .delete-btn { opacity: 1; }
-    .delete-btn:hover { color: #c0392b; background: #fde8e8; }
+
+    /* Reveal on card hover */
+    .book-card:hover .delete-btn {
+      color: #bbb;
+      border-top-color: var(--border);
+      background: var(--bg);
+    }
+
+    /* Highlight red only when hovering the button itself */
+    .delete-btn:hover {
+      color: #c0392b !important;
+      background: #fde8e8 !important;
+      border-top-color: #f5c6c6 !important;
+    }
 
     /* TOAST */
     #save-toast {
@@ -1552,12 +1566,6 @@
           This is much cleaner than concatenating strings.
         */
         card.innerHTML = `
-          <!--
-            DELETE BUTTON — hidden until card is hovered (CSS handles that).
-            data-record-id lets the JS know which record to delete.
-          -->
-          <button class="delete-btn" data-record-id="${record.id}" title="Delete book">✕ Delete</button>
-
           <div class="card-header">
             <div>
               <div class="book-title">${escape(f['Title'] || 'Untitled')}</div>
@@ -1622,6 +1630,8 @@
             data-field="Notes"
             title="Click to add notes"
           >${f['Notes'] ? escape(f['Notes']) : '<span style="color:var(--ink-muted);font-style:normal;font-size:0.78rem">Add notes…</span>'}</div>
+
+          <button class="delete-btn" data-record-id="${record.id}">✕ Delete</button>
         `;
 
         booksGrid.appendChild(card);

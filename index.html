@@ -1198,7 +1198,15 @@
         if (e.target === addModal) addModal.classList.remove('open');
       });
 
-      document.getElementById('modal-save-btn').addEventListener('click', handleAddBook);
+      /*
+        Remove before adding to prevent duplicate listeners if
+        onDataLoaded is called more than once (e.g. after a refresh).
+        Without this, each call stacks another listener on the button
+        and handleAddBook runs multiple times per click.
+      */
+      const saveBtn = document.getElementById('modal-save-btn');
+      saveBtn.removeEventListener('click', handleAddBook);
+      saveBtn.addEventListener('click', handleAddBook);
 
       /*
         ============================================================
@@ -1312,6 +1320,14 @@
 
           status.textContent = `✓ Found: "${book.title}"${book.author_name ? ' by ' + book.author_name[0] : ''}. Check the fields below and adjust if needed.`;
           status.className   = 'lookup-status success';
+
+          /*
+            Set a flag so handleAddBook knows this book came from
+            Open Library rather than being typed manually.
+            We store it on the window object so it's accessible
+            from anywhere in the script.
+          */
+          window.lookupUsed = true;
 
         } catch (err) {
           status.textContent = '⚠ Lookup failed: ' + err.message;
@@ -2028,8 +2044,35 @@
         document.getElementById('lookup-input').value = '';
         document.getElementById('lookup-status').textContent = '';
         document.getElementById('lookup-status').className   = 'lookup-status';
+        window.lookupUsed = false; // reset for next time
 
         showToast('✓ Book added');
+
+        /*
+          TRACKING: book_added event
+          ===========================
+          We push an event to the dataLayer — the same object GTM
+          is listening to. GTM picks this up and forwards it to GA4.
+
+          This is the exact same pattern Snowplow uses:
+          - dataLayer.push() = sp('trackSelfDescribingEvent')
+          - event name       = schema name
+          - parameters       = schema properties
+
+          window.dataLayer is guaranteed to exist because GTM
+          initialised it in the <head> snippet.
+
+          We use || to provide fallback values so GA4 never
+          receives undefined — it expects strings or numbers.
+        */
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event:        'book_added',
+          input_method: window.lookupUsed ? 'open_library' : 'manual',
+          book_status:  status  || 'not set',
+          book_genre:   genre   || 'not set',
+          book_rating:  rating  ? parseInt(rating) : 0
+        });
         applyFilters();
 
       } catch (err) {
